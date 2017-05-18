@@ -170,7 +170,7 @@ public class BaseInvadersServer implements BIServer, Runnable {
                                         pw.flush();
                                         while (!socket.isClosed()) {
                                             String line = br.readLine();
-                                            System.out.println(line);
+                                            //System.out.println(line);
                                             if (Long.parseLong(line) != lastTick) {
                                                 socket.close();
                                                 break;
