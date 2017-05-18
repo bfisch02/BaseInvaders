@@ -291,14 +291,26 @@ public class BaseInvadersServer implements BIServer, Runnable {
         String cmd = st.nextToken();
         String out = null;
         switch (cmd) {
-            case "ACCELERATE": {
-                gameMap.setAcceleration(user, Double.parseDouble(st.nextToken()), Double.parseDouble(st.nextToken()));
-                out = "ACCELERATE_OUT DONE";
+            case "DRIVE": {
+                gameMap.setVelocity(user, Double.parseDouble(st.nextToken()), Double.parseDouble(st.nextToken()));
+                out = "DRIVE_OUT DONE";
             }
             break;
             case "BRAKE": {
                 gameMap.setBrake(user);
                 out = "BRAKE_OUT DONE";
+            }
+            break;
+            case "MINES": {
+                final StringBuilder sb = new StringBuilder("MINES_OUT ");
+                Player p = gameMap.getPlayer(user);
+                List<Mine> mines = new LinkedList<>();
+                gameMap.getMines().stream().filter(mine -> mine.distanceTo(p) < Configurations.getVisionRadius()).forEach(mine -> mines.add(mine));
+                sb.append(mines.size()).append(" ");
+                mines.stream().forEach((mine) -> {
+                    sb.append(mine.getOwner() != null ? mine.getOwner().getName() : "--").append(" ").append(mine.getPosition().getX()).append(" ").append(mine.getPosition().getY()).append(" ");
+                });
+                out = sb.toString();
             }
             break;
             case "STATUS": {

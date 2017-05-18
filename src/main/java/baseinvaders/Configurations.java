@@ -45,7 +45,7 @@ public class Configurations {
     private static double brakeFriction = .987;
     private static double speed = .1;
     private static double captureRadius = 5;
-    private static double visionRadius = 150;
+    private static double visionRadius = 1000;
     private static int maxBombs = 1;
     private static double bombPlacementRadius = 50;
     private static double bombExplosionRadius = 15;

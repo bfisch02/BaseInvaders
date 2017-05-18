@@ -20,7 +20,7 @@ public class GameMapImpl implements Runnable, Serializable, GameMap {
 
     private final Map<String, Player> players = new ConcurrentHashMap<>();
     private final Map<String, List<String>> userUpdates = new ConcurrentHashMap<>();
-    private final Map<String, Double> userAcceleration = new ConcurrentHashMap<>();
+    private final Map<String, Double> userVelocity = new ConcurrentHashMap<>();
     private final Map<String, Double> userAngle = new ConcurrentHashMap<>();
     private final Map<String, Boolean> userBrakes = new ConcurrentHashMap<>();
     private final Set<Mine> mines = new CopyOnWriteArraySet<>();
@@ -56,11 +56,13 @@ public class GameMapImpl implements Runnable, Serializable, GameMap {
         });
 
         players.values().stream().forEach(player -> {
-            player.getPosition().setX(Configurations.getMapWidth() / 2).setY(Configurations.getMapHeight() / 2);
+            double x = Math.random() * Configurations.getMapWidth();
+            double y = Math.random() * Configurations.getMapHeight();
+            player.getPosition().setX(x).setY(y);
             player.getVelocity().setX(0).setY(0);
         });
 
-        userAcceleration.clear();
+        userVelocity.clear();
         userAngle.clear();
         userBrakes.clear();
         userLastScan.clear();
@@ -75,7 +77,7 @@ public class GameMapImpl implements Runnable, Serializable, GameMap {
         this.isRunning = run;
     }
 
-    private synchronized void nextRound() {
+    private synchronized void nextRound() { 
         if (!isRunning) {
             return;
         }
@@ -83,27 +85,18 @@ public class GameMapImpl implements Runnable, Serializable, GameMap {
         players.entrySet().stream().parallel().forEach(entry -> {
             String user = entry.getKey();
             Player player = entry.getValue();
-            if (userBrakes.containsKey(user) && userBrakes.get(user)) {
-                player.getVelocity().multiply(Configurations.getBrakeFriction());
-                Point p = player.getPosition();
-                p.add(player.getVelocity()).setX((p.getX() + Configurations.getMapWidth()) % Configurations.getMapWidth()).setY((p.getY() + Configurations.getMapHeight()) % Configurations.getMapHeight());
+            double velocity = Configurations.getSpeed() * (userAngle.containsKey(user) && userVelocity.containsKey(user) ? userVelocity.get(user) : 0);
+            double angle = userAngle.containsKey(user) ? userAngle.get(user) : 0;
 
-            } else {
-                double acceleration = Configurations.getSpeed() * (userAngle.containsKey(user) && userAcceleration.containsKey(user) ? userAcceleration.get(user) : 0);
-                double angle = userAngle.containsKey(user) ? userAngle.get(user) : 0;
+            double x = velocity * Math.cos(angle);
+            double y = velocity * Math.sin(angle);
 
-                double x = acceleration * Math.cos(angle);
-                double y = acceleration * Math.sin(angle);
+            player.getVelocity().setX(x);
+            player.getVelocity().setY(y);
 
-                player.getVelocity().add(x * .5, y * .5);
+            Point p = player.getPosition();
 
-                Point p = player.getPosition();
-                p.add(player.getVelocity()).setX((p.getX() + Configurations.getMapWidth()) % Configurations.getMapWidth()).setY((p.getY() + Configurations.getMapHeight()) % Configurations.getMapHeight());
-
-                player.getVelocity().add(x * .5, y * .5);
-
-            }
-            player.getVelocity().multiply(Configurations.getFriction());
+            p.add(player.getVelocity()).setX((p.getX() + Configurations.getMapWidth()) % Configurations.getMapWidth()).setY((p.getY() + Configurations.getMapHeight()) % Configurations.getMapHeight());
             player.nextRound();
         });
 
@@ -115,6 +108,22 @@ public class GameMapImpl implements Runnable, Serializable, GameMap {
             }
         });
 
+        mloop:
+        for (Mine mine : mines) {
+            Player closest = null;
+            for (Player player : players.values()) {
+                if (mine.getPosition().distanceTo(player.getPosition()) < Configurations.getCaptureRadius()) {
+                    if (closest == null) {
+                        closest = player;
+                    } else {
+                        continue mloop;
+                    }
+                }
+            }
+            if (closest != null) {
+                mine.setOwner(closest);
+            }
+        }
         mines.stream().filter((mine) -> (mine.getOwner() != null)).forEach((mine) -> {
             userScores.put(mine.getOwner().getName(), 1 + userScores.get(mine.getOwner().getName()));
         });
@@ -150,19 +159,19 @@ public class GameMapImpl implements Runnable, Serializable, GameMap {
         data.get(user).add(update);
     }
 
-    public synchronized void setAcceleration(String user, double angle, double acceleration) throws BaseInvadersException {
-        if (acceleration < 0 || acceleration > 1) {
-            throw new BaseInvadersException("Acceleration must be between 0 and 1");
+    public synchronized void setVelocity(String user, double angle, double velocity) throws BaseInvadersException {
+        if (velocity < 0 || velocity > 150) {
+            throw new BaseInvadersException("Velocity must be between 0 and 150");
         }
         userBrakes.put(user, false);
         userAngle.put(user, angle);
-        userAcceleration.put(user, acceleration);
+        userVelocity.put(user, velocity);
     }
 
     public synchronized void setBrake(String user) {
         userBrakes.put(user, true);
         userAngle.put(user, 0.0);
-        userAcceleration.put(user, 0.0);
+        userVelocity.put(user, 0.0);
     }
 
     public synchronized void placeBomb(String user, double x, double y, long delay) throws BaseInvadersException {
@@ -247,7 +256,7 @@ public class GameMapImpl implements Runnable, Serializable, GameMap {
 
     @Override
     public synchronized String toString() {
-        return "GameMap{" + "players=" + players + ", userUpdates=" + userUpdates + ", userAcceleration=" + userAcceleration + ", userAngle=" + userAngle + ", userBrakes=" + userBrakes + ", mines=" + mines + ", userScores=" + userScores + ", isRunning=" + isRunning + '}';
+        return "GameMap{" + "players=" + players + ", userUpdates=" + userUpdates + ", userVelocity=" + userVelocity + ", userAngle=" + userAngle + ", userBrakes=" + userBrakes + ", mines=" + mines + ", userScores=" + userScores + ", isRunning=" + isRunning + '}';
     }
 
     @Override
